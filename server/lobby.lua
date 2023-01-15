@@ -1,7 +1,8 @@
--- Variables
+local Blash = exports['blash-core']:GetObject()
+
 local LOBBY_STATUS = {
-    ['waiting'] = "WAITING",
-    ['started'] = "STARTED",
+    WAITING = 'waiting',
+    STARTED = 'started',
 }
 local lobbies = {
     ['lobby1'] = {
@@ -19,6 +20,7 @@ local players = {}
         lobby: string
 ]] --
 function setupPlayerForGame(player, lobby)
+    TriggerClientEvent('lobbymenu:CloseMenu', player)
     local lobbyNumber = tonumber(string.match(lobby, '%d+'))
     Blash.Functions.SetPlayerBucket(player, lobbyNumber)
     local location = lobbies[lobby].location
@@ -54,6 +56,8 @@ exports('createLobby', createLobby)
         joinLobby(name, player) - Joins the specified lobby or first available if specified can not be found
 ]] --
 function joinLobby(name, player)
+    if not player then player = source end
+    print(name, player)
     if lobbies[name] then
         local lobby = lobbies[name]
         if getPlayerLobby(player) == name then
@@ -63,23 +67,31 @@ function joinLobby(name, player)
 
         if #lobbies[name].players < Config.Lobby.maxPlayersPerLobby then
             table.insert(lobbies[name].players, player)
+            Blash.Functions.Notify(player, 'You\'ve joined the lobby.', 'success')
             if lobby.status == LOBBY_STATUS.STARTED then
-                setupPlayerForGame(player, name)
+                Blash.Functions.Notify(player, 'You are joining the game...', 'info')
+                -- setupPlayerForGame(player, name)
+            else
+                Blash.Functions.Notify(player, 'Please wait for the lobby to start...', 'info')
             end
             return
         else
-            exports['boppe-logging']:Debug('blash-game', 'joinLobby', name .. ' lobby is full')
+            Blash.Functions.Notify(player, 'That lobby is full.', 'error')
         end
     else
-        exports['boppe-logging']:Error('blash-game', 'joinLobby', name .. ' lobby does not exist')
+        Blash.Functions.Notify(player, 'There was an error joining that lobby.', 'error')
     end
 
     local newLobbyName = "lobby" .. #lobbies + 1
     createLobby(newLobbyName)
     table.insert(lobbies[newLobbyName].players, player)
+    Blash.Functions.Notify(player, 'You\'ve joined the lobby (' .. newLobbyName .. ').', 'success')
 end
 exports('joinLobby', joinLobby)
-RegisterNetEvent('blash-game:server:joinLobby', joinLobby)
+
+RegisterNetEvent('blash-game:server:joinLobby', function (name)
+    joinLobby(name, source)
+end)
 
 --[[
     Function to leave a lobby.
@@ -109,7 +121,7 @@ function getLobbies()
     for name, lobby in pairs(lobbies) do
         local lobbyInfo = {}
         lobbyInfo.name = name
-        lobbyInfo.players = #lobby.players
+        lobbyInfo.players = lobby.players
         lobbyInfo.status = lobby.status
         lobbyInfo.location = lobby.location
         if #lobby.players < Config.Lobby.maxPlayersPerLobby then
